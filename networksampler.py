@@ -1,4 +1,17 @@
 from scapy.all import sniff, Ether, IP, TCP, UDP, ARP, ICMP
+import requests
+import json
+
+def query_ollama3b(prompt):
+    url = "http://localhost:11434/api/generate"
+    payload = {
+    "model": "llama3.1",
+    "prompt": prompt,
+    "stream": False
+    }
+    response = requests.post(url, json=payload)
+    answer = response.json()["response"]
+    return answer
 
 PORT_PROTOCOLS = {
     443: "QUIC",
@@ -13,7 +26,7 @@ PORT_PROTOCOLS = {
 }
 
 def packet_summary(pkt):
-    # Get layers
+ 
     layers = []
     current_layer = pkt
     while current_layer:
@@ -21,7 +34,6 @@ def packet_summary(pkt):
         current_layer = current_layer.payload
         if current_layer is None or current_layer.__class__.__name__ == "NoPayload":
             break
-
 
     if pkt.haslayer(Ether):
         src_mac = pkt[Ether].src
@@ -52,13 +64,25 @@ def packet_summary(pkt):
     else:
         proto = pkt.__class__.__name__
 
-    print(f"Layers: {' -> '.join(layers)} | MAC: {src_mac} -> {dst_mac} | IP: {src_ip} -> {dst_ip} | Info: {info} | Protocol: {proto}")
+    return {
+        "layers": layers,
+        "src_mac": src_mac,
+        "dst_mac": dst_mac,
+        "src_ip": src_ip,
+        "dst_ip": dst_ip,
+        "info": info,
+        "protocol": proto
+    }
+
 
 packets = sniff(count=50, iface="Ethernet")
 samples = packets[::5]
 
-for pkt in samples:
-    packet_summary(pkt)
+
+packet_data = [packet_summary(pkt) for pkt in samples]
+
+for data in packet_data:
+    print(data)
 
 
-
+print(query_ollama3b(f"Analyze the packets and explain them and whether they are malicious and what they are doing {packet_data}"))
